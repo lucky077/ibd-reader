@@ -1,17 +1,17 @@
 package util
 
 import com.alibaba.fastjson.JSON
-import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
+import const.MYSQL_TYPE_VARCHAR
+import struct.sdi.TableInfo
 
 object TableManager {
 
-    data class Table (
-        var name: String,
-        var columns: JSONArray,
-        var indexes: JSONArray,
-        var reader: InnoDBFileReader
-    ){}
+    data class Table(
+        val name: String,
+        val tableInfo: TableInfo,
+        val reader: InnoDBFileReader
+    ) {}
 
     var tableMap = mutableMapOf<String, Table>()
 
@@ -22,12 +22,24 @@ object TableManager {
                 table = tableMap[name]
                 if (table == null) {
                     val dataRoot = "/usr/local/mysql/data"
-                    val path = "$dataRoot/$name/$name.ibd"
+                    val dbName = "test"
+                    val path = "$dataRoot/$dbName/$name.ibd"
                     val reader = InnoDBFileReader(path)
                     val process = Runtime.getRuntime().exec("ibd2sdi $path")
                     val sdi = JSON.parseArray(String(process.inputStream.readAllBytes()))[1] as JSONObject
-                    val obj = sdi.getJSONObject("object").getJSONObject("dd_object")
-                    table = Table(name, obj["columns"] as JSONArray, obj["indexes"] as JSONArray, reader)
+
+                    val tableInfo =
+                        JSON.parseObject(sdi.getJSONObject("object").getString("dd_object"), TableInfo::class.java)
+
+                    for ((index, column) in tableInfo.columns.filter { it.is_nullable }.withIndex()) {
+                        tableInfo.nullableMap[column.name] = index
+                    }
+
+                    for ((index, column) in tableInfo.columns.filter { it.type == MYSQL_TYPE_VARCHAR }.withIndex()) {
+                        tableInfo.lenMap[column.name] = index
+                    }
+
+                    table = Table(name, tableInfo, reader)
                     tableMap[name] = table!!
                 }
             }
@@ -35,8 +47,5 @@ object TableManager {
         return table as Table
     }
 
-
-
-    fun test() {}
 
 }

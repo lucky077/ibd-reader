@@ -1,44 +1,54 @@
 package struct
 
-import util.CommonUtil
+import struct.sdi.Index
+import struct.sdi.TableInfo
+import util.bytes2Int32
+import util.bytes2Int64
 
 /**
  * 组成索引的页，type: 0x45BF
  */
-class IndexPage(data: List<Byte>): Page(data) {
+class IndexPage(data: List<Byte>) : Page(data) {
 
     /** Page Directory Slot数量 */
-    val inDirSlots = CommonUtil.bytes2Int16(read(2));
-    val heapTop = CommonUtil.bytes2Int16(read(2));
-    val nHeap = CommonUtil.bytes2Int16(read(2));
-    val free = CommonUtil.bytes2Int16(read(2));
-    val garbage = CommonUtil.bytes2Int16(read(2));
-    val lastInsert = CommonUtil.bytes2Int16(read(2));
-    val direction = CommonUtil.bytes2Int16(read(2));
-    val nDirection = CommonUtil.bytes2Int16(read(2));
+    val inDirSlots = bytes2Int32(read(2))
+    val heapTop = bytes2Int32(read(2))
+    val nHeap = bytes2Int32(read(2))
+    val free = bytes2Int32(read(2))
+    val garbage = bytes2Int32(read(2))
+    val lastInsert = bytes2Int32(read(2))
+    val direction = bytes2Int32(read(2))
+    val nDirection = bytes2Int32(read(2))
+
     /** 页内有效数据数量 */
-    val nRecs = CommonUtil.bytes2Int16(read(2));
-    val maxTrxId = CommonUtil.bytes2Int64(read(8));
+    val nRecs = bytes2Int32(read(2))
+    val maxTrxId = bytes2Int64(read(8))
+
     /** 在索引内的高度，0为叶子节点 */
-    val level = CommonUtil.bytes2Int16(read(2));
-    val indexId = CommonUtil.bytes2Int64(read(8));
-    private val _ignore = read(20);
+    val level = bytes2Int32(read(2))
+    val indexId = bytes2Int64(read(8))
+    private val _ignore = read(20)
+    val infimumRecordOffset = p + 5
 
     val trailerChkSum: Int
     val trailerLsn: Int
-    var slots = mutableListOf<Short>()
+    var slots = mutableListOf<Int>()
 
 
     init {
         reset(-1)
-        trailerLsn = CommonUtil.bytes2Int32(readReverse(4))
-        trailerChkSum = CommonUtil.bytes2Int32(readReverse(4))
+        trailerLsn = bytes2Int32(readReverse(4))
+        trailerChkSum = bytes2Int32(readReverse(4))
         if (trailerChkSum != chkSum || trailerLsn != lsn.toInt()) {
             throw RuntimeException("data check error")
         }
-        for (i in 1 .. inDirSlots) {
-            slots.add(CommonUtil.bytes2Int16(readReverse(2)))
+        repeat(inDirSlots) {
+            slots.add(bytes2Int32(readReverse(2)))
         }
+    }
+
+    fun getInfimumRecord(indexInfo: Index, tableInfo: TableInfo): Record {
+        return Record(this, infimumRecordOffset, indexInfo, tableInfo)
     }
 
 }

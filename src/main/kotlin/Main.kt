@@ -1,9 +1,7 @@
-
-
+import const.ORDER_ASC
+import const.PRIMARY_KEY
 import core.Executer
-import core.Order
-import struct.Range
-import util.CommonUtil
+import struct.Equal
 
 
 fun main(args: Array<String>) {
@@ -12,9 +10,10 @@ fun main(args: Array<String>) {
 
 
     Executer("test")
-        .primary()
-        .type(Range(max = 10000))
-        .limit(10, Order.DESC)
+//        .primary()
+        .index(PRIMARY_KEY)
+        .type(Equal(value0 = 1999999))
+        .limit(10, ORDER_ASC)
         .run()
 
 }

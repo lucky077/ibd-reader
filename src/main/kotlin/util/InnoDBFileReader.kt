@@ -17,20 +17,18 @@ class InnoDBFileReader(fileName: String) {
         return read0(pageNo, 1, IndexPage::class).first()
     }
 
-    fun <T: Page>read0(pageNo: Int, clazz: KClass<T>): T {
+    fun <T : Page> read0(pageNo: Int, clazz: KClass<T>): T {
         return read0(pageNo, 1, clazz).first()
     }
 
-    fun <T: Page>read0(pageNo: Int, num: Int, clazz: KClass<T>): ArrayList<T> {
-        var list = arrayListOf<T>()
+    fun <T : Page> read0(pageNo: Int, num: Int, clazz: KClass<T>): ArrayList<T> {
+        val list = arrayListOf<T>()
         file.seek((pageNo * pageSize).toLong())
 
-        for (i in 1 .. num) {
-
+        repeat(num) {
             val b = ByteArray(pageSize)
             file.read(b, 0, pageSize)
             list.add(clazz.java.constructors.first().newInstance(b.toList()) as T)
-
         }
 
         return list
