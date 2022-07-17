@@ -3,10 +3,10 @@ package struct
 /**
  * 等值
  */
-class Equal(var value0: Any) : Type {
+class Equal(var va: Any) : Type {
 
     override fun compare(v: Any): Int {
-        return (v as Comparable<Any>).compareTo(value0)
+        return (v as Comparable<Any>).compareTo(va)
     }
 
 }

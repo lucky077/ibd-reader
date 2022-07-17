@@ -8,7 +8,7 @@ import util.bit2Bool
 import util.bit2Int
 import util.bytes2Int32
 
-class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tableInfo: TableInfo) :
+class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tableInfo: TableInfo) :
     ByteReader(page.data) {
 
     /** 可变字符串长度表 */
@@ -21,7 +21,7 @@ class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tab
     val keyList = mutableListOf<Any>()
 
     /** 索引key顺序表 */
-    val keyOrderList = mutableListOf<Int>()
+    val  keyOrderList = mutableListOf<Int>()
 
     /** @see const.RECORD_TYPE_NORMAL */
     val type: Int
@@ -29,7 +29,7 @@ class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tab
     /** 组记录数，非组内最大记录为0 */
     val nOwned: Int
 
-    val nextRecord: Int
+    private val nextRecord: Int
 
     init {
 
@@ -91,8 +91,8 @@ class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tab
     /**
      * 读取非叶子节点指向的页
      */
-    private fun readPageNo(): Int {
-        if (type == RECORD_TYPE_NON_LEAF) throw RuntimeException("This is not a non-leaf node")
+    fun readPageNo(): Int {
+        if (type != RECORD_TYPE_NON_LEAF) throw RuntimeException("This is not a non-leaf node")
         //非主键索引会有主键，跳过
         if (indexInfo.type != INDEX_TYPE_PRIMARY) {
             indexInfo.elements.filter { it.hidden }.map { it.column_opx }.forEach {
@@ -115,7 +115,8 @@ class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tab
      * 获取吓一条记录
      */
     fun next(): Record {
-        return Record(page, offset + nextRecord, indexInfo, tableInfo)
+        if (nextRecord == 0xFFCA) return page.getSupremumRecord(indexInfo, tableInfo)
+        return Record(offset + nextRecord, page, indexInfo, tableInfo)
     }
 
     /**
@@ -125,6 +126,9 @@ class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tab
      */
     fun compareTo(types: List<Type>): Int {
 
+        if (type == RECORD_TYPE_INFIMUM) return -1
+        if (type == RECORD_TYPE_SUPREMUM) return 1
+
         for ((index, type) in types.withIndex()) {
 
             var r = type.compare(keyList[index])
@@ -132,7 +136,7 @@ class Record(val page: IndexPage, val offset: Int, val indexInfo: Index, val tab
             if (r != 0) {
                 //索引顺序为降序时只需反向结果即可，在其它地方全部按升序处理
                 if (keyOrderList[index] == ORDER_DESC) {
-                    return if (r == 1) -1 else 1
+                    return if (r > 0) -1 else 1
                 }
                 return r
             }

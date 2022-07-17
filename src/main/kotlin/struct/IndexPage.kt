@@ -28,10 +28,11 @@ class IndexPage(data: List<Byte>) : Page(data) {
     val level = bytes2Int32(read(2))
     val indexId = bytes2Int64(read(8))
     private val _ignore = read(20)
-    val infimumRecordOffset = p + 5
+    private val infimumRecordOffset = p + 5
+    private val supremumRecordOffset = p + 18
 
-    val trailerChkSum: Int
-    val trailerLsn: Int
+    private val trailerChkSum: Int
+    private val trailerLsn: Int
     var slots = mutableListOf<Int>()
 
 
@@ -48,7 +49,10 @@ class IndexPage(data: List<Byte>) : Page(data) {
     }
 
     fun getInfimumRecord(indexInfo: Index, tableInfo: TableInfo): Record {
-        return Record(this, infimumRecordOffset, indexInfo, tableInfo)
+        return Record(infimumRecordOffset, this, indexInfo, tableInfo)
+    }
+    fun getSupremumRecord(indexInfo: Index, tableInfo: TableInfo): Record {
+        return Record(supremumRecordOffset, this, indexInfo, tableInfo)
     }
 
 }
