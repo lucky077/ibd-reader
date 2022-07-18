@@ -1,7 +1,7 @@
-package struct
+package ibd.struct
 
-import util.bytes2Int32
-import util.bytes2Int64
+import ibd.util.bytes2Int32
+import ibd.util.bytes2Int64
 
 /**
  * 基本页头结构

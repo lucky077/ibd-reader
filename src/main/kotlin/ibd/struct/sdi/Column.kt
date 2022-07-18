@@ -1,10 +1,10 @@
-package struct.sdi
+package ibd.struct.sdi
 
 class Column {
 
     var name = ""
 
-    /** @see const.MYSQL_TYPE_DECIMAL */
+    /** @see ibd.const.MYSQL_TYPE_DECIMAL */
     var type = 0
     var is_nullable = false
     var is_zerofill = false

@@ -1,4 +1,4 @@
-package struct
+package ibd.struct.type
 
 /**
  * 范围
@@ -18,6 +18,8 @@ class Range(val min: Any? = null, val max: Any? = null) : Type {
             if (r <= 0) {
                 return 0
             }
+        } else {
+            return 0
         }
 
         return 1

@@ -1,22 +1,21 @@
-package core
+package ibd.core
 
-import const.INDEX_TYPE_UNIQUE
-import const.ORDER_ASC
-import const.ORDER_DESC
-import const.RECORD_TYPE_NORMAL
+import ibd.const.*
+import ibd.struct.Record
+import ibd.struct.type.Equal
+import ibd.struct.type.Type
+import ibd.util.binarySearch
 import org.slf4j.LoggerFactory
-import struct.Equal
-import struct.Record
-import struct.Type
-import util.TableManager
-import util.binarySearch
+import java.util.*
 
+
+private val EMPTY_LIST = listOf<Map<String, Any>>()
 /**
  * 执行逻辑链
  */
 class Executer(var tableName: String) {
 
-    val log = LoggerFactory.getLogger(this.javaClass)
+    private val log = LoggerFactory.getLogger(this.javaClass)
 
     lateinit var index: String
     var types: List<Type> = listOf()
@@ -72,7 +71,7 @@ class Executer(var tableName: String) {
         return limit(0, size, order)
     }
 
-    fun run() {
+    fun exec(): List<Map<String, Any>> {
 
         val table = TableManager.load(tableName)
         val reader = table.reader
@@ -87,9 +86,9 @@ class Executer(var tableName: String) {
         val keyCount = indexInfo.elements.filter { !it.hidden }.size
         if (types.size > keyCount) types = types.slice(0 until keyCount)
 
-        //找到首个非等值的条件,判断实际应用的排序key的顺序与实际顺序是否一致
-        //Record比较函数已经处理了顺序问题。在需求顺序与实际顺序不一致时从后往前查找即可
-        var isRight = true
+        //找到首个非等值的条件,判断实际应用的排序key的顺序与实际顺序是否一致:isRight
+        //isRight决定了有多个值命中时候边界在左还是右
+        var isRight = false
         for ((index, element) in indexInfo.elements.withIndex()) {
             val type = types.getOrNull(index)
             if (type == null || type !is Equal) {
@@ -98,74 +97,99 @@ class Executer(var tableName: String) {
             }
         }
 
-
         //唯一索引按limit 1的方式处理，单独处理性能提升很有限
         if (indexInfo.type <= INDEX_TYPE_UNIQUE) {
             offset = 0; size = 1
         }
-
-        //寻找左边界，isDesc的情况下寻找右边界
         var pageNo = rootPageNo
-        var record:Record
+        var record: Record
 
-        while (true) {
+        var stack: Deque<Record> = LinkedList()
+
+        l1@ while (true) {
 
             val page = reader.read(pageNo)
             val slots = page.slots
 
-            if (page.slots.size > 2) {
-                //不需要搜索Infimum和Supremum，结果 + 1保持下标一致
-                val slotI = binarySearch(slots.slice(1 until slots.size - 1)
-                    , { Record(it, page, indexInfo, tableInfo) }
-                    , types
-                    , isRight
-                ) + 1
+//            printSlotsKeys(slots, page, indexInfo, tableInfo)
 
-                //目标大于本层级所有节点，进入下一级查找
+            //数量太少时不使用二分查找
+            if (page.slots.size < 17) {
+                record = page.getInfimumRecord(indexInfo, tableInfo)
+            } else {
+
+                val slotI = binarySearch(slots,
+                    { Record(it, page, indexInfo, tableInfo) },
+                    types,
+                    isRight
+                )
+
+                //目标大于当前level所有节点，准备进入下一个level查找
                 if (slotI == slots.lastIndex) {
-                    if (page.level == 0) {
-                        return
+                    val record1 = Record(slots[slots.lastIndex - 1], page, indexInfo, tableInfo)
+                    //通常这个最后slot指向的记录就是本页最后的记录，但索引desc的情况下有记录不进组，必须遍历散落的记录
+                    if (record1.next().type == RECORD_TYPE_SUPREMUM) {
+                        if (page.level == 0) {
+                            return EMPTY_LIST
+                        }
+                        pageNo = record1.readPageNo()
+                        continue
                     }
-                    pageNo = Record(slots[slots.lastIndex - 1], page, indexInfo, tableInfo).readPageNo()
-                    continue
                 }
 
                 record = Record(slots[slotI - 1], page, indexInfo, tableInfo)
-            } else {
-                record = page.getInfimumRecord(indexInfo, tableInfo)
             }
 
-            var lastRecord = record.next()
-            record = lastRecord
-            var cmp = lastRecord.compareTo(types)
-            if (cmp < 0 || isRight && cmp == 0) {
-                while (true) {
-                    lastRecord = record
-                    record = record.next()
-                    cmp = record.compareTo(types)
-                    if (!isRight && cmp == 0) {
-                        break
-                    } else if (cmp > 0) {
+            var lastRecord:Record
+            while (true) {
+                lastRecord = record
+                record = record.next()
+                val cmp = record.compareTo(types)
+                //可能的值一定在上一个; isRight只能通过cmp > 0结束
+                if (cmp > 0) {
+                    record = lastRecord
+                    break
+                }
+                if (!isRight && cmp == 0) {
+                    //当前和上一个都可能包括边界，先处理上一个,这里使用stack保证优先左边界
+                    if (lastRecord.type != RECORD_TYPE_INFIMUM) {
+                        stack.push(record)
                         record = lastRecord
-                        break
                     }
+                    break
                 }
             }
 
-
-            // 已经找到叶子节点边界
-            if (record.type == RECORD_TYPE_NORMAL) {
-                break
+            if (record.type == RECORD_TYPE_INFIMUM) {
+                return EMPTY_LIST
             }
 
-            // 查找下一层级
+            if (record.type == RECORD_TYPE_NORMAL) {
+                // 已经找到叶子节点边界
+                if (record.compareTo(types) == 0) {
+                    break
+                }
+                if (stack.isEmpty()) {
+                    return EMPTY_LIST
+                }
+                //pop之前的多种可能的节点
+                while (true) {
+                    record = stack.pop()
+                    if (record.type == RECORD_TYPE_NON_LEAF) {
+                        break
+                    }
+                    // 已经找到叶子节点边界（只有cmp == 0才能push到stack）
+                    break@l1
+                }
+            }
+            // 查找下一个level
             pageNo = record.readPageNo()
         }
 
-        if (record.compareTo(types) != 0) {
-            return
-        }
+
         log.debug("find key: {}", record.keyList.joinToString(",") { it.toString() })
+
+        return listOf(mapOf("key" to record.keyList.first()))
 
         //页内所有记录都符合，无需比较
         //页内有记录不符合，一边比较一边读取
@@ -173,8 +197,6 @@ class Executer(var tableName: String) {
         while (true) {
 
         }
-
-        TODO("数据太少的时候会不会出问题")
 
     }
 }

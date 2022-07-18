@@ -1,4 +1,4 @@
-package struct.sdi
+package ibd.struct.sdi
 
 class TableInfo {
     var row_format = 0

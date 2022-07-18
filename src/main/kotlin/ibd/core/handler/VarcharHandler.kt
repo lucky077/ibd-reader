@@ -1,8 +1,7 @@
-package core.handler
+package ibd.core.handler
 
-import core.FieldTypesAdapter
-import struct.Record
-import struct.sdi.Column
+import ibd.struct.Record
+import ibd.struct.sdi.Column
 import java.nio.charset.Charset
 
 object VarcharHandler : FieldTypesAdapter {

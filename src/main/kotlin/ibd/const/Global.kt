@@ -1,4 +1,4 @@
-package const
+package ibd.const
 
 const val ORDER_ASC = 2
 const val ORDER_DESC = 3

@@ -1,11 +1,9 @@
-package core
+package ibd.core.handler
 
-import const.MYSQL_TYPE_LONG
-import const.MYSQL_TYPE_VARCHAR
-import core.handler.Int32Handler
-import core.handler.VarcharHandler
-import struct.Record
-import struct.sdi.Column
+import ibd.const.MYSQL_TYPE_LONG
+import ibd.const.MYSQL_TYPE_VARCHAR
+import ibd.struct.Record
+import ibd.struct.sdi.Column
 
 fun find(type: Int): FieldTypesAdapter {
     return when (type) {
@@ -21,7 +19,8 @@ interface FieldTypesAdapter {
 
 
     fun readValue0(record: Record, column: Column): Any?
-    fun readValue(record: Record, column: Column): Any? {
+
+    fun readValueWrapper(record: Record, column: Column): Any? {
         if (isNull(record, column)) {
             return null
         }
@@ -31,7 +30,7 @@ interface FieldTypesAdapter {
 }
 
 fun readValue(record: Record, column: Column): Any? {
-    return find(column.type).readValue(record, column)
+    return find(column.type).readValueWrapper(record, column)
 }
 
 fun isNull(record: Record, column: Column): Boolean {

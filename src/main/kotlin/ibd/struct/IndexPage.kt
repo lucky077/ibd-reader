@@ -1,9 +1,9 @@
-package struct
+package ibd.struct
 
-import struct.sdi.Index
-import struct.sdi.TableInfo
-import util.bytes2Int32
-import util.bytes2Int64
+import ibd.struct.sdi.Index
+import ibd.struct.sdi.TableInfo
+import ibd.util.bytes2Int32
+import ibd.util.bytes2Int64
 
 /**
  * 组成索引的页，type: 0x45BF

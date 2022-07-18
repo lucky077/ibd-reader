@@ -1,4 +1,4 @@
-package struct
+package ibd.struct.type
 
 /**
  * 等值

@@ -1,4 +1,4 @@
-package struct
+package ibd.struct.type
 
 import java.nio.charset.Charset
 

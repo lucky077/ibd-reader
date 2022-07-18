@@ -1,7 +1,7 @@
-package util
+package ibd.util
 
-import struct.Record
-import struct.Type
+import ibd.struct.Record
+import ibd.struct.type.Type
 
 
 fun bytes2Int32(bytes: List<Byte>): Int {
@@ -32,37 +32,37 @@ fun bit2Int(byte: Byte, offset: Int, size: Int = 1): Int {
  * 返回与目标等值最左/最右的下标
  * 如果目标不存在,返回按顺序应该存在的位置
  */
-fun binarySearch(list: List<Int>, target: Int, isRight: Boolean): Int {
-    var low = 0
-    var high = list.size - 1
-    var mid = 0
-    var find = false
-    var cmp = 0
-    while (low <= high) {
-        mid = (low + high).ushr(1)
-        val midVal = list[mid]
-        cmp = compareValues(midVal, target)
-        if (!find && cmp == 0) find = true
-        if (isRight) {
-            if (cmp <= 0)
-                low = mid + 1
-            else
-                high = mid - 1
-        } else {
-            if (cmp < 0)
-                low = mid + 1
-            else
-                high = mid - 1
-        }
-    }
-    if (find && cmp > 0) {
-        return mid - 1
-    }
-    if (cmp < 0){
-        return mid + 1
-    }
-    return mid
-}
+//fun binarySearch(list: List<Int>, target: Int, isRight: Boolean): Int {
+//    var low = 0
+//    var high = list.size - 1
+//    var mid = 0
+//    var find = false
+//    var cmp = 0
+//    while (low <= high) {
+//        mid = (low + high).ushr(1)
+//        val midVal = list[mid]
+//        cmp = compareValues(midVal, target)
+//        if (!find && cmp == 0) find = true
+//        if (isRight) {
+//            if (cmp <= 0)
+//                low = mid + 1
+//            else
+//                high = mid - 1
+//        } else {
+//            if (cmp < 0)
+//                low = mid + 1
+//            else
+//                high = mid - 1
+//        }
+//    }
+//    if (find && cmp > 0) {
+//        return mid - 1
+//    }
+//    if (cmp < 0){
+//        return mid + 1
+//    }
+//    return mid
+//}
 
 /**
  * 查找page directory,返回与条件匹配的slot

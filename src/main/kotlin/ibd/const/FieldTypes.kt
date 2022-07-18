@@ -1,4 +1,4 @@
-package const
+package ibd.const
 
 const val MYSQL_TYPE_DECIMAL = 1
 const val MYSQL_TYPE_TINY = 2

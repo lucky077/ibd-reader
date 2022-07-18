@@ -1,9 +1,8 @@
-package core.handler
+package ibd.core.handler
 
-import core.FieldTypesAdapter
-import struct.Record
-import struct.sdi.Column
-import util.bytes2Int32
+import ibd.struct.Record
+import ibd.struct.sdi.Column
+import ibd.util.bytes2Int32
 
 object Int32Handler : FieldTypesAdapter {
     override fun readValue0(record: Record, column: Column): Any? =

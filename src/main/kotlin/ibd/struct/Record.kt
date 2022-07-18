@@ -1,12 +1,13 @@
-package struct
+package ibd.struct
 
-import const.*
-import core.readValue
-import struct.sdi.Index
-import struct.sdi.TableInfo
-import util.bit2Bool
-import util.bit2Int
-import util.bytes2Int32
+import ibd.const.*
+import ibd.core.handler.readValue
+import ibd.struct.sdi.Index
+import ibd.struct.sdi.TableInfo
+import ibd.struct.type.Type
+import ibd.util.bit2Bool
+import ibd.util.bit2Int
+import ibd.util.bytes2Int32
 
 class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tableInfo: TableInfo) :
     ByteReader(page.data) {
@@ -23,7 +24,7 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
     /** 索引key顺序表 */
     val  keyOrderList = mutableListOf<Int>()
 
-    /** @see const.RECORD_TYPE_NORMAL */
+    /** @see ibd.const.RECORD_TYPE_NORMAL */
     val type: Int
 
     /** 组记录数，非组内最大记录为0 */
@@ -55,7 +56,6 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
             }
         }
 
-
         if (type <= RECORD_TYPE_NON_LEAF) {
 
             //读取变长字符串的长度表
@@ -81,7 +81,7 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
             //读取key
             indexInfo.elements.filter { !it.hidden }.forEach {
                 keyOrderList.add(it.order)
-                keyList.add(readValue(this, tableInfo.columns[it.column_opx])!!)
+                keyList.add( readValue(this, tableInfo.columns[it.column_opx])!!)
             }
         }
 
@@ -115,8 +115,7 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
      * 获取吓一条记录
      */
     fun next(): Record {
-        if (nextRecord == 0xFFCA) return page.getSupremumRecord(indexInfo, tableInfo)
-        return Record(offset + nextRecord, page, indexInfo, tableInfo)
+        return Record(offset + nextRecord and 0x4000 - 1, page, indexInfo, tableInfo)
     }
 
     /**

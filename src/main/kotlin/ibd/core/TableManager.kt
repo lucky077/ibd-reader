@@ -1,19 +1,35 @@
-package util
+package ibd.core
 
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import const.MYSQL_TYPE_VARCHAR
-import struct.sdi.TableInfo
+import ibd.const.MYSQL_TYPE_VARCHAR
+import ibd.struct.sdi.TableInfo
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.io.FileNotFoundException
 
 object TableManager {
+
+    private val log: Logger = LoggerFactory.getLogger(javaClass)
 
     data class Table(
         val name: String,
         val tableInfo: TableInfo,
         val reader: InnoDBFileReader
-    ) {}
+    )
 
-    var tableMap = mutableMapOf<String, Table>()
+    private var tableMap = mutableMapOf<String, Table>()
+    private lateinit var dbRoot: String
+
+    fun init(dbRoot: String) {
+        TableManager.dbRoot = dbRoot
+        val root = File(dbRoot)
+        if (!root.isDirectory) throw FileNotFoundException()
+        root.listFiles { _, name -> name.endsWith(".ibd") }!!
+            .map { it.name.removeSuffix(".ibd") }
+            .forEach { load(it) }
+    }
 
     fun load(name: String): Table {
         var table = tableMap[name]
@@ -21,9 +37,7 @@ object TableManager {
             synchronized(tableMap) {
                 table = tableMap[name]
                 if (table == null) {
-                    val dataRoot = "/usr/local/mysql/data"
-                    val dbName = "test"
-                    val path = "$dataRoot/$dbName/$name.ibd"
+                    val path = "$dbRoot/$name.ibd"
                     val reader = InnoDBFileReader(path)
                     val process = Runtime.getRuntime().exec("ibd2sdi $path")
                     val sdi = JSON.parseArray(String(process.inputStream.readAllBytes()))[1] as JSONObject
@@ -41,6 +55,8 @@ object TableManager {
 
                     table = Table(name, tableInfo, reader)
                     tableMap[name] = table!!
+                    reader.read(0)
+                    log.info("table {} loaded", name)
                 }
             }
         }

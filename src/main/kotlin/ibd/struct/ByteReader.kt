@@ -1,4 +1,4 @@
-package struct
+package ibd.struct
 
 /**
  * 继承此类使用bytes2Int32(read(size))解析字节数组中的数据到实体对应字段
