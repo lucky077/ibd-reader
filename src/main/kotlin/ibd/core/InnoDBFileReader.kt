@@ -18,7 +18,7 @@ class InnoDBFileReader(fileName: String) {
     }
 
     fun <T : Page> read(pageNo: Int, clazz: KClass<T>): T {
-        file.seek((pageNo * pageSize).toLong())
+        file.seek((pageNo.toLong() * pageSize))
 
         val b = ByteArray(pageSize)
         file.read(b, 0, pageSize)

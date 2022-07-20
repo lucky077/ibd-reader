@@ -7,5 +7,7 @@ class Index {
     var se_private_data = ""
     var type = 0
     var elements = mutableListOf<Element>()
+    var varcharCount = 0
+    var nullableCount = 0
 
 }

@@ -1,6 +1,7 @@
 package ibd.core
 
 import ibd.const.*
+import ibd.struct.IndexPage
 import ibd.struct.Record
 import ibd.struct.type.Equal
 import ibd.struct.type.Type
@@ -10,6 +11,7 @@ import java.util.*
 
 
 private val EMPTY_LIST = listOf<Map<String, Any>>()
+
 /**
  * 执行逻辑链
  */
@@ -40,9 +42,6 @@ class Executer(var tableName: String) {
         return type(types.toList())
     }
 
-    /**
-     * 非等值条件的下一个失效
-     */
     fun type(types: List<Type>): Executer {
         var validSize = 0
         for (type in types) {
@@ -51,6 +50,7 @@ class Executer(var tableName: String) {
                 break
             }
         }
+        //非等值条件的下一个失效
         this.types = types.slice(0 until validSize)
         return this
     }
@@ -71,11 +71,12 @@ class Executer(var tableName: String) {
         return limit(0, size, order)
     }
 
-    fun exec(): List<Map<String, Any>> {
+
+    fun exec(): List<Map<String, Any?>> {
 
         val table = TableManager.load(tableName)
         val reader = table.reader
-        val indexInfo = table.tableInfo.indexes.first { it.name == index }
+        val indexInfo = table.tableInfo.indexes.firstOrNull { it.name == index } ?: throw RuntimeException("Please check index name")
         val tableInfo = table.tableInfo
 
         //获取索引根页号
@@ -98,20 +99,19 @@ class Executer(var tableName: String) {
         }
 
         //唯一索引按limit 1的方式处理，单独处理性能提升很有限
-        if (indexInfo.type <= INDEX_TYPE_UNIQUE) {
+        if (indexInfo.type <= INDEX_TYPE_UNIQUE && types.isNotEmpty() && types.all { it is Equal }) {
             offset = 0; size = 1
         }
         var pageNo = rootPageNo
+        var page:IndexPage
         var record: Record
 
         var stack: Deque<Record> = LinkedList()
 
         l1@ while (true) {
 
-            val page = reader.read(pageNo)
+            page = reader.read(pageNo)
             val slots = page.slots
-
-//            printSlotsKeys(slots, page, indexInfo, tableInfo)
 
             //数量太少时不使用二分查找
             if (page.slots.size < 17) {
@@ -139,6 +139,7 @@ class Executer(var tableName: String) {
 
                 record = Record(slots[slotI - 1], page, indexInfo, tableInfo)
             }
+
 
             var lastRecord:Record
             while (true) {
@@ -186,17 +187,89 @@ class Executer(var tableName: String) {
             pageNo = record.readPageNo()
         }
 
-
         log.debug("find key: {}", record.keyList.joinToString(",") { it.toString() })
 
-        return listOf(mapOf("key" to record.keyList.first()))
-
-        //页内所有记录都符合，无需比较
-        //页内有记录不符合，一边比较一边读取
-
-        while (true) {
-
+        if (size == 1 && offset == 0) {
+            return listOf(record.toObject())
         }
 
+        //下面取数据粗写了，比如offset应该遍历页
+
+        //未处理的计数
+        var size0 = -1
+        var offset0 = -1
+        if (size > 0 || offset > 0) {
+            offset0 = offset
+        }
+        if (size > 0) size0 = size
+
+        val result = mutableListOf<Map<String, Any?>>()
+
+        if (!isRight) {
+            if (offset0 > 0) offset0--
+            else {
+                result.add(record.toObject())
+                if (size0 > 0) size0--
+            }
+            while (size0 != 0 || offset0 != 0) {
+
+                record = record.next()
+                if (record.type == RECORD_TYPE_SUPREMUM) {
+                    if (page.next <= 0) {
+                        break
+                    }
+                    record = reader.read(page.next).getInfimumRecord(indexInfo, tableInfo)
+                    continue
+                }
+                val cmp = record.compareTo(types)
+                if (cmp != 0) {
+                    break
+                }
+
+                if (offset0 > 0) offset0--
+                else {
+                    result.add(record.toObject())
+                    if (size0 > 0) size0--
+                }
+            }
+
+            return result
+        }
+
+        val temp = mutableListOf<Record>()
+        var hasPrevPage = true
+        record = page.getInfimumRecord(indexInfo, tableInfo)
+
+        l2@ while (hasPrevPage) {
+            while (true) {
+                record = record.next()
+                val cmp = record.compareTo(types)
+                if (cmp > 0) {
+                    break
+                }
+                if (cmp == 0) {
+                    temp.add(record)
+                } else {
+                    hasPrevPage = false
+                }
+            }
+            temp.reverse()
+            for (record in temp) {
+                if (size0 == 0 && offset0 == 0) break@l2
+
+                if (offset0 > 0) offset0--
+                else {
+                    result.add(record.toObject())
+                    if (size0 > 0) size0--
+                }
+            }
+            temp.clear()
+            if (page.prev <= 0) break
+            record = reader.read(page.prev).getInfimumRecord(indexInfo, tableInfo)
+        }
+
+
+
+        return result
     }
 }

@@ -7,7 +7,7 @@ class Prefix(val prefix: String) : Type {
     /**
      * 字符串前缀匹配使用范围，例：abc% 只需要查找大于等于abc并且小于abd
      */
-    override fun compare(v: Any): Int {
+    override fun compare0(v: Any): Int {
         if (v !is String) throw IllegalArgumentException("prefix use only to string")
         val min = prefix
         val bytes = prefix.encodeToByteArray()

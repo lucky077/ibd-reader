@@ -6,7 +6,8 @@ package ibd.struct.type
 class Range(val min: Any? = null, val max: Any? = null) : Type {
 
 
-    override fun compare(v: Any): Int {
+    @Suppress("UNCHECKED_CAST")
+    override fun compare0(v: Any): Int {
         if (min != null) {
             val r = (v as Comparable<Any>).compareTo(min)
             if (r <= 0) {

@@ -45,12 +45,20 @@ object TableManager {
                     val tableInfo =
                         JSON.parseObject(sdi.getJSONObject("object").getString("dd_object"), TableInfo::class.java)
 
-                    for ((index, column) in tableInfo.columns.filter { it.is_nullable }.withIndex()) {
+                    for ((index, column) in tableInfo.columns.filter { it.nullable }.withIndex()) {
                         tableInfo.nullableMap[column.name] = index
                     }
 
                     for ((index, column) in tableInfo.columns.filter { it.type == MYSQL_TYPE_VARCHAR }.withIndex()) {
                         tableInfo.lenMap[column.name] = index
+                    }
+
+                    //读取变长字符串、可空的数量
+                    tableInfo.varcharCount = tableInfo.columns.count { it.type == MYSQL_TYPE_VARCHAR }
+                    tableInfo.indexes.forEach { indexInfo ->
+                        val keyOpxSet = indexInfo.elements.filter { !it.hidden }.map { it.column_opx + 1 }
+                        indexInfo.varcharCount = tableInfo.columns.count { it.type == MYSQL_TYPE_VARCHAR && keyOpxSet.contains(it.ordinal_position) }
+                        indexInfo.nullableCount = tableInfo.columns.count { it.nullable && keyOpxSet.contains(it.ordinal_position) }
                     }
 
                     table = Table(name, tableInfo, reader)

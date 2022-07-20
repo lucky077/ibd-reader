@@ -19,10 +19,10 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
     val nullList = mutableListOf<Boolean>()
 
     /** 索引key表 */
-    val keyList = mutableListOf<Any>()
+    val keyList = mutableListOf<Any?>()
 
     /** 索引key顺序表 */
-    val  keyOrderList = mutableListOf<Int>()
+    val keyOrderList = mutableListOf<Int>()
 
     /** @see ibd.const.RECORD_TYPE_NORMAL */
     val type: Int
@@ -30,20 +30,27 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
     /** 组记录数，非组内最大记录为0 */
     val nOwned: Int
 
+    /** 主键索引叶子节点 */
+    val clustered: Boolean
+
     private val nextRecord: Int
 
     init {
-
         reset(offset)
         val header = readReverse(5)
         nOwned = bit2Int(header[0], 4, 4)
         type = bit2Int(header[2], 5, 3)
         nextRecord = bytes2Int32(header.slice(3 until 5))
 
-        //读取叶子节点的null list
-        if (type == RECORD_TYPE_NORMAL && indexInfo.name == PRIMARY_KEY) {
+        clustered = indexInfo.type == INDEX_TYPE_PRIMARY && type == RECORD_TYPE_NORMAL
 
-            val nullListSize = tableInfo.columns.filter { it.is_nullable }.size
+        if (type <= RECORD_TYPE_NON_LEAF) {
+            //读取null list
+            //只有主键叶子节点才需要所有列
+            val nullListSize = if (!clustered)
+                indexInfo.nullableCount
+            else
+                tableInfo.nullableMap.size
             if (nullListSize > 0) {
                 val byteSize = if (nullListSize % 8 == 0) nullListSize / 8 else nullListSize / 8 + 1
                 val nullByteList = readReverse(byteSize).asReversed()
@@ -54,19 +61,15 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
                     }
                 }
             }
-        }
 
-        if (type <= RECORD_TYPE_NON_LEAF) {
+            //处理可变字符串长度
+            //只有主键叶子节点才需要所有列
+            val varcharCount = if (!clustered)
+                indexInfo.varcharCount
+            else
+                tableInfo.varcharCount
 
-            //读取变长字符串的长度表
-            //非叶子节点只需要处理index key column
-            val varcharList = if (type == RECORD_TYPE_NON_LEAF) {
-                val keyOpxSet = indexInfo.elements.filter { !it.hidden }.map { it.column_opx + 1 }.toSet()
-                tableInfo.columns.filter { it.type == MYSQL_TYPE_VARCHAR && keyOpxSet.contains(it.ordinal_position) }
-            } else {
-                tableInfo.columns.filter { it.type == MYSQL_TYPE_VARCHAR }
-            }
-            repeat(varcharList.size) {
+            repeat(varcharCount) {
                 val b = readReverse(1).first()
                 if (bit2Bool(b, 0)) {
                     lenList.add(bytes2Int32(listOf(b, readReverse(1).first())) shl 17 shr 17)
@@ -75,16 +78,13 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
                 }
 
             }
-
             reset(offset)
-
             //读取key
             indexInfo.elements.filter { !it.hidden }.forEach {
                 keyOrderList.add(it.order)
-                keyList.add( readValue(this, tableInfo.columns[it.column_opx])!!)
+                keyList.add(readValue(this, tableInfo.columns[it.column_opx]))
             }
         }
-
     }
 
 
@@ -99,17 +99,9 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
                 readValue(this, tableInfo.columns[it])
             }
         }
-
         return bytes2Int32(read(4))
     }
 
-    /**
-     * 从行中读取所有数据
-     */
-    fun readALL(): List<Any> {
-
-        return listOf()
-    }
 
     /**
      * 获取吓一条记录
@@ -141,7 +133,28 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
             }
         }
 
+        //没有条件认为所有数据都是匹配的
         return 0
+    }
+
+    fun toObject(): Map<String, Any?> {
+
+        val res = mutableMapOf<String, Any?>()
+
+        for ((i, element) in indexInfo.elements.withIndex()) {
+            val colInfo = tableInfo.columns[element.column_opx]
+            if (colInfo.hidden == 2) {
+                read(colInfo.char_length)
+                continue
+            }
+            val col = if (!element.hidden) {
+                keyList[i]
+            } else {
+                readValue(this, colInfo)
+            }
+            res[colInfo.name] = col
+        }
+        return res
     }
 
 }

@@ -5,6 +5,7 @@ package ibd.struct.type
  */
 interface Type {
 
-    fun compare(v: Any): Int
+    fun compare0(v: Any): Int
+    fun compare(v: Any?): Int = if (v == null) -1 else compare0(v)
 
 }

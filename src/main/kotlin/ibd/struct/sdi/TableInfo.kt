@@ -6,4 +6,5 @@ class TableInfo {
     val columns = mutableListOf<Column>()
     val nullableMap = mutableMapOf<String, Int>()
     val lenMap = mutableMapOf<String, Int>()
+    var varcharCount = 0
 }
