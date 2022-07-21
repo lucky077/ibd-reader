@@ -17,6 +17,10 @@ open class ByteReader(var data: List<Byte>) {
         p = i
     }
 
+    fun skip(size: Int) {
+        p += size
+    }
+
     /**
      * 向前读取
      */

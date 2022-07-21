@@ -4,6 +4,27 @@ import ibd.struct.Record
 import ibd.struct.type.Type
 
 
+/**
+ * 处理mysql有符号正数
+ */
+fun signed(number: Int, size: Int = 4): Int {
+    val sign = number ushr size * 8 - 1
+    if (sign == 0) {
+        return -number
+    }
+    val offset = 1 + (4 - size) * 8
+    return number shl offset ushr offset
+}
+
+fun signed(number: Long, size: Int = 8): Long {
+    val sign = number ushr size * 8 - 1
+    if (sign == 0L) {
+        return -number
+    }
+    val offset = 1 + (8 - size) * 8
+    return number shl offset ushr offset
+}
+
 fun bytes2Int32(bytes: List<Byte>): Int {
     return bytes2Int64(bytes).toInt()
 }

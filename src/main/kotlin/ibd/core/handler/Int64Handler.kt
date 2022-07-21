@@ -2,15 +2,15 @@ package ibd.core.handler
 
 import ibd.struct.Record
 import ibd.struct.sdi.Column
-import ibd.util.bytes2Int32
+import ibd.util.bytes2Int64
 import ibd.util.signed
 
-object Int32Handler : FieldTypesAdapter {
+object Int64Handler : FieldTypesAdapter {
     override fun readValue0(record: Record, column: Column): Any {
         return  if (column.unsigned)
-            bytes2Int32(record.read(4)).toUInt()
+            bytes2Int64(record.read(8)).toULong()
         else
-            signed(bytes2Int32(record.read(4)))
+            signed(bytes2Int64(record.read(8)))
 
     }
 

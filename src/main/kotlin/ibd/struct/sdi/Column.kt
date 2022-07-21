@@ -18,5 +18,8 @@ class Column {
     var hidden = 0
     var ordinal_position = 0
     var char_length = 0
+    var numeric_precision = 0
+    var numeric_scale = 0
+    var datetime_precision = 0
 
 }

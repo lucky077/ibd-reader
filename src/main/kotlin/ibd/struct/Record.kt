@@ -72,9 +72,9 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
             repeat(varcharCount) {
                 val b = readReverse(1).first()
                 if (bit2Bool(b, 0)) {
-                    lenList.add(bytes2Int32(listOf(b, readReverse(1).first())) shl 17 shr 17)
+                    lenList.add(bytes2Int32(listOf(b, readReverse(1).first())) shl 17 ushr 17)
                 } else {
-                    lenList.add(bytes2Int32(listOf(b)) shl 25 shr 25)
+                    lenList.add(bytes2Int32(listOf(b)) shl 25 ushr 25)
                 }
 
             }
@@ -122,7 +122,7 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
 
         for ((index, type) in types.withIndex()) {
 
-            var r = type.compare(keyList[index])
+            val r = type.compare(keyList[index])
             // 不相等无需比较下一个key，
             if (r != 0) {
                 //索引顺序为降序时只需反向结果即可，在其它地方全部按升序处理
@@ -144,7 +144,7 @@ class Record(val offset: Int, val page: IndexPage, val indexInfo: Index, val tab
         for ((i, element) in indexInfo.elements.withIndex()) {
             val colInfo = tableInfo.columns[element.column_opx]
             if (colInfo.hidden == 2) {
-                read(colInfo.char_length)
+                skip(colInfo.char_length)
                 continue
             }
             val col = if (!element.hidden) {
