@@ -22,6 +22,9 @@ object TableManager {
     private var tableMap = mutableMapOf<String, Table>()
     private lateinit var dbRoot: String
 
+    /**
+     * 加载文件夹内所有ibd文件
+     */
     fun init(dbRoot: String) {
         TableManager.dbRoot = dbRoot
         val root = File(dbRoot)

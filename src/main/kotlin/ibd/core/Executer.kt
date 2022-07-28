@@ -71,7 +71,9 @@ class Executer(var tableName: String) {
         return limit(0, size, order)
     }
 
-
+    /**
+     * 核心查找逻辑
+     */
     fun exec(): List<Map<String, Any?>> {
 
         val table = TableManager.load(tableName)
@@ -80,8 +82,8 @@ class Executer(var tableName: String) {
         val tableInfo = table.tableInfo
 
         //获取索引根页号
-        val rootPageNo = indexInfo.se_private_data.split(";")[1].split("=")[1].toInt()
-        log.debug("index root pageNo: {}", rootPageNo)
+        var pageNo = indexInfo.se_private_data.split(";")[1].split("=")[1].toInt()
+        log.debug("index root pageNo: {}", pageNo)
 
         //条件数量不能超过索引key数量
         val keyCount = indexInfo.elements.filter { !it.hidden }.size
@@ -102,18 +104,18 @@ class Executer(var tableName: String) {
         if (indexInfo.type <= INDEX_TYPE_UNIQUE && types.isNotEmpty() && types.all { it is Equal }) {
             offset = 0; size = 1
         }
-        var pageNo = rootPageNo
         var page:IndexPage
         var record: Record
 
-        var stack: Deque<Record> = LinkedList()
+        val stack: Deque<Record> = LinkedList()
 
+        //在索引中寻找叶子节点边界
         l1@ while (true) {
 
             page = reader.read(pageNo)
             val slots = page.slots
 
-            //数量太少时不使用二分查找
+            //数量太少时不使用二分查找，直接从最小记录开始遍历
             if (page.slots.size < 17) {
                 record = page.getInfimumRecord(indexInfo, tableInfo)
             } else {
@@ -127,7 +129,7 @@ class Executer(var tableName: String) {
                 //目标大于当前level所有节点，准备进入下一个level查找
                 if (slotI == slots.lastIndex) {
                     val record1 = Record(slots[slots.lastIndex - 1], page, indexInfo, tableInfo)
-                    //通常这个最后slot指向的记录就是本页最后的记录，但索引desc的情况下有记录不进组，必须遍历散落的记录
+                    //通常这个最后的slot指向的记录就是本页最后的记录，但索引desc的情况下有记录不进组，必须遍历散落的记录
                     if (record1.next().type == RECORD_TYPE_SUPREMUM) {
                         if (page.level == 0) {
                             return EMPTY_LIST
@@ -136,7 +138,7 @@ class Executer(var tableName: String) {
                         continue
                     }
                 }
-
+                //因为slot指向的是组内最后的记录，所以从上一个slot指向的记录开始
                 record = Record(slots[slotI - 1], page, indexInfo, tableInfo)
             }
 
@@ -146,7 +148,7 @@ class Executer(var tableName: String) {
                 lastRecord = record
                 record = record.next()
                 val cmp = record.compareTo(types)
-                //可能的值一定在上一个; isRight只能通过cmp > 0结束
+                //可能的值一定在上一个; isRight的情况只能通过cmp > 0结束
                 if (cmp > 0) {
                     record = lastRecord
                     break
@@ -161,12 +163,13 @@ class Executer(var tableName: String) {
                 }
             }
 
+            //要查找的目标在所有数据之前，目标不存在
             if (record.type == RECORD_TYPE_INFIMUM) {
                 return EMPTY_LIST
             }
 
+            // 已经到达叶子节点边界
             if (record.type == RECORD_TYPE_NORMAL) {
-                // 已经找到叶子节点边界
                 if (record.compareTo(types) == 0) {
                     break
                 }
